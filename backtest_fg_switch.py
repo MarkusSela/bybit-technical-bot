@@ -54,13 +54,14 @@ def fetch_fg_history(days=180):
         print('Errore F&G: ' + str(e) + ' — uso F&G=50 fisso')
         return {}
 
-def get_fg_for_ts(fg_history, timestamp_ms):
+def get_fg_for_ts(fg_history, ts):
     try:
-        dt   = datetime.utcfromtimestamp(timestamp_ms / 1000)
+        dt = pd.Timestamp(ts)
+        if dt.tzinfo is not None:
+            dt = dt.tz_convert('UTC').tz_localize(None)
         date = dt.strftime('%Y-%m-%d')
         if date in fg_history:
             return fg_history[date]
-        # Cerca il giorno precedente
         for i in range(1, 8):
             prev = (dt - timedelta(days=i)).strftime('%Y-%m-%d')
             if prev in fg_history:
@@ -72,11 +73,17 @@ def get_fg_for_ts(fg_history, timestamp_ms):
 # ── Data loader ────────────────────────────────────────────────────────────
 def load_pair(symbol, timeframe):
     name    = symbol.replace('/', '_').replace(':', '_')
-    pattern = str(DATA_DIR / 'futures' / (name + '-' + timeframe + '*'))
+    pattern = str(DATA_DIR / 'futures' / (name + '-' + timeframe + '-futures.feather'))
     files   = glob.glob(pattern)
+    if not files:
+        pattern = str(DATA_DIR / 'futures' / (name + '-' + timeframe + '*'))
+        files   = glob.glob(pattern)
     if not files:
         pattern = str(DATA_DIR / (name + '-' + timeframe + '*'))
         files   = glob.glob(pattern)
+    if not files:
+        return None
+    files = [f for f in files if 'funding' not in f and 'mark' not in f]
     if not files:
         return None
     f = files[0]
